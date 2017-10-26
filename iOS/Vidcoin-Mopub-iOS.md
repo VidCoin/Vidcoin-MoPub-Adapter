@@ -1,7 +1,7 @@
 # Vidcoin Mediation Adapter for MoPub SDK for iOS
 ![Vidcoin](https://d3rud9259azp35.cloudfront.net/documentation/Vidcoin-Logo.png)
 
-Adapter Version: 1.0.0    
+Adapter Version: 1.0.1    
 Manager: https://manager.vidcoin.com    
 Contact: publishers@vidcoin.com    
 
