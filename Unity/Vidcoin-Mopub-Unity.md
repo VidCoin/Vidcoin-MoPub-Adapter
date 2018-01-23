@@ -1,7 +1,7 @@
 # Vidcoin Mediation Adapter for MoPub SDK for Unity
 ![Vidcoin](https://d3rud9259azp35.cloudfront.net/documentation/Vidcoin-Logo.png)
 
-Adapter Version: 1.0.1    
+Adapter Version: 1.0.2    
 Manager: https://manager.vidcoin.com    
 Contact: publishers@vidcoin.com    
 
@@ -11,7 +11,7 @@ Contact: publishers@vidcoin.com
 	- Xcode 7.0 or higher
 	- Mopub SDK v4.11.0 or higher
 - Android
-	- Android SDK v2.3.3 (API level 10) or higher
+	- Android SDK v4.0 (API level 14) or higher
 	- Mopub SDK v4.11.0 or higher
 
 ## Includes

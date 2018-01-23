@@ -1,7 +1,7 @@
 # Vidcoin Mediation Adapter for MoPub SDK for iOS
 ![Vidcoin](https://d3rud9259azp35.cloudfront.net/documentation/Vidcoin-Logo.png)
 
-Adapter Version: 1.0.1    
+Adapter Version: 1.0.2    
 Manager: https://manager.vidcoin.com    
 Contact: publishers@vidcoin.com    
 
@@ -9,7 +9,7 @@ Contact: publishers@vidcoin.com
 - Xcode 7.0 or higher
 - Deployment target of iOS 7.0 or higher
 - Mopub SDK v4.11.0 or higher
-- Vidcoin Android SDK v1.3.1 or higher
+- Vidcoin Android SDK v1.4.5 or higher
 
 ## Instructions
 - Add the MoPub SDK to your project. Please refer to the  [getting started guide](http://www.mopub.com/resources/docs/ios-sdk-integration/ios-getting-started/) for detailed instructions.

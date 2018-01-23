@@ -1,14 +1,14 @@
 # Vidcoin Mediation Adapter for MoPub SDK for Android
 ![Vidcoin](https://d3rud9259azp35.cloudfront.net/documentation/Vidcoin-Logo.png)
 
-Adapter Version: 1.0.1    
+Adapter Version: 1.0.2    
 Manager: https://manager.vidcoin.com    
 Contact: publishers@vidcoin.com    
 
 ## Requirements
-- Android SDK v2.3.3 (API level 10) or higher
+- Android SDK v4.0 (API level 14) or higher
 - Mopub SDK v4.11.0 or higher
-- Vidcoin Android SDK v1.3.1 or higher
+- Vidcoin Android SDK v1.3.8 or higher
 
 ## Instructions
 - Add the MoPub SDK to your project. Please refer to the  [getting started guide](https://www.mopub.com/resources/docs/android-sdk-integration/android-getting-started/) for detailed instructions.
