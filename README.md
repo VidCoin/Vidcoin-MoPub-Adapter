@@ -6,15 +6,14 @@ Adapter that enables Vidcoin ad mediation through MoPub
 
 ## General instructions
 To integrate Vidcoin in your MoPub ad serving flow, you will need:
+
 - A publisher account on Vidcoin's platform
-- At least one app on Vidcoin's platform
-- A placement for each of your apps on Vidcoin's platform
 
-### Account and app creation
 
-  1. Create an account on [https://manager.vidcoin.com](https://manager.vidcoin.com), and fill in all the required information.
-  2. Create one or multiple apps on the platform.
-  3. For each individual app, create a placement (corresponding to a zone in your app where you want to serve video ads).
+### Account settings
+
+  1. Create an account on [https://manager.vidcoin.com](https://manager.vidcoin.com), and fill in all the required information. You can skip this step if you have already an account.
+  2. Sign-in your Vidcoin account.
 
 Once this is done, you can proceed to the technical integration.
 
