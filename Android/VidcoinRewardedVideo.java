@@ -1,15 +1,16 @@
 package com.mopub.mobileads;
 
 import android.app.Activity;
+import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.text.TextUtils;
 
-import com.mopub.common.BaseLifecycleListener;
 import com.mopub.common.LifecycleListener;
-import com.mopub.common.MediationSettings;
+import com.mopub.common.MoPub;
 import com.mopub.common.MoPubReward;
 import com.mopub.common.logging.MoPubLog;
+import com.mopub.common.privacy.PersonalInfoManager;
 import com.vidcoin.sdkandroid.VidCoin;
 import com.vidcoin.sdkandroid.core.VidCoinBase;
 import com.vidcoin.sdkandroid.core.interfaces.VidCoinCallBack;
@@ -25,29 +26,33 @@ public class VidcoinRewardedVideo extends CustomEventRewardedVideo {
 
     private static final String VIDCOIN_AD_NETWORK_CONSTANT = "vidcoin_id";
     private static final String APP_ID = "appId";
+    private static final String ZONE_ID = "zoneId";
     private static final String PLACEMENT_CODE = "placementCode";
 
     private static final String KEY_USER_APP_ID = "VC_USER_APP_ID";
     private static final String KEY_USER_BIRTH_YEAR = "VC_USER_BIRTH_YEAR";
     private static final String KEY_USER_GENDER = "VC_USER_GENDER";
 
-    private static VidcoinRewardedVideoListener sVidcoinVideoListener = new VidcoinRewardedVideoListener();
-    private static VidcoinLifecycleListener sVidcoinLifecycleListener = new VidcoinLifecycleListener();
-    private static String placementCode = null;
-    private static boolean sIsInitialized = false;
+    private VidcoinRewardedVideoListener vidcoinVideoListener = new VidcoinRewardedVideoListener();
+    private VidcoinLifecycleListener vidcoinLifecycleListener = new VidcoinLifecycleListener();
+    private String placementCode = null;
+    private String zoneId = null;
+    private boolean sIsInitialized = false;
 
     private Activity vidcoinContext = null;
+
+    private boolean isLoaded;
 
     @Nullable
     @Override
     protected CustomEventRewardedVideoListener getVideoListenerForSdk() {
-        return sVidcoinVideoListener;
+        return vidcoinVideoListener;
     }
 
     @Nullable
     @Override
     protected LifecycleListener getLifecycleListener() {
-        return sVidcoinLifecycleListener;
+        return vidcoinLifecycleListener;
     }
 
     @NonNull
@@ -57,7 +62,8 @@ public class VidcoinRewardedVideo extends CustomEventRewardedVideo {
     }
 
     @Override
-    protected void onInvalidate() { }
+    protected void onInvalidate() {
+    }
 
     @Override
     protected boolean checkAndInitializeSdk(@NonNull Activity launcherActivity, @NonNull Map<String, Object> localExtras, @NonNull Map<String, String> serverExtras) throws Exception {
@@ -78,8 +84,18 @@ public class VidcoinRewardedVideo extends CustomEventRewardedVideo {
             return false;
         }
 
+        //pass the zoneId from moPub to vidCoin sdk
+        fetchZoneIdFromExtra(serverExtras);
+
         VidCoin.getInstance().setVerboseTag(true);
-        VidCoin.getInstance().init(launcherActivity, appId, sVidcoinVideoListener);
+        PersonalInfoManager personalInfoManager = MoPub.getPersonalInformationManager();
+        boolean isGDPRApplicable = true;
+        if (personalInfoManager != null && personalInfoManager.gdprApplies()) {
+            isGDPRApplicable = personalInfoManager.gdprApplies();
+        }
+
+        VidCoin.getInstance().init(launcherActivity, appId, MoPub.canCollectPersonalInformation(),
+                isGDPRApplicable);
 
         vidcoinContext = launcherActivity;
         sIsInitialized = true;
@@ -88,31 +104,64 @@ public class VidcoinRewardedVideo extends CustomEventRewardedVideo {
 
     @Override
     protected void loadWithSdkInitialized(@NonNull Activity activity, @NonNull Map<String, Object> localExtras, @NonNull Map<String, String> serverExtras) throws Exception {
+        PersonalInfoManager personalInfoManager = MoPub.getPersonalInformationManager();
+        if (personalInfoManager != null)
+            VidCoin.getInstance().setGDPRApplicable(personalInfoManager.gdprApplies());
+        if (personalInfoManager != null && personalInfoManager.gdprApplies()) {
+            boolean canCollectPersonalInfo = personalInfoManager.canCollectPersonalInformation();
+            VidCoin.getInstance().setUserConsent(canCollectPersonalInfo);
+        }
         if (serverExtras.containsKey(PLACEMENT_CODE)) {
             placementCode = serverExtras.get(PLACEMENT_CODE);
             if (TextUtils.isEmpty(placementCode)) placementCode = "";
         }
+        // pass the zoneId from moPub to vidCoin sdk
+        fetchZoneIdFromExtra(serverExtras);
 
         Object adUnitObject = localExtras.get("com_mopub_ad_unit_id");
-        if ((adUnitObject != null) && ((adUnitObject instanceof String))) {
-            setUpMediationSettings(((String)adUnitObject));
+        if (adUnitObject instanceof String) {
+            setUpMediationSettings((String) adUnitObject);
         }
         vidcoinContext = activity;
-        loadAvailableVideos();
+
+        VidCoin.getInstance().requestAdForPlacement(placementCode, zoneId, vidcoinVideoListener);
+
+        if (isLoaded) {
+            loadAvailableVideos();
+        } else {
+            new Handler().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    if (!isLoaded) {
+                        MoPubLog.d("Vidcoin: Timeout runnable rewarded");
+                        MoPubRewardedVideoManager.onRewardedVideoLoadFailure(VidcoinRewardedVideo.class, "vidcoin_id", MoPubErrorCode.NETWORK_NO_FILL);
+                    }
+                }
+            }, 5000);
+        }
     }
 
     @Override
     protected boolean hasVideoAvailable() {
-        return VidCoin.getInstance().videoIsAvailableForPlacement(placementCode);
+        boolean isVideoAvailable = VidCoin.getInstance().videoIsAvailableForPlacement(placementCode, zoneId);
+        if (isVideoAvailable)
+            isLoaded = true;
+        return isVideoAvailable;
     }
 
     @Override
     protected void showVideo() {
         if (hasVideoAvailable() && vidcoinContext != null) {
             MoPubLog.d("Presenting Vidcoin ad.");
-            VidCoin.getInstance().playAdForPlacement(vidcoinContext, placementCode, -1);
+            VidCoin.getInstance().playAdForPlacement(vidcoinContext, placementCode, zoneId, -1);
         } else {
             MoPubLog.d("Failed to present Vidcoin ad.");
+        }
+    }
+
+    private void fetchZoneIdFromExtra(@NonNull Map<String, String> serverExtras) {
+        if (serverExtras.containsKey(ZONE_ID)) {
+            zoneId = serverExtras.get(ZONE_ID);
         }
     }
 
@@ -147,8 +196,9 @@ public class VidcoinRewardedVideo extends CustomEventRewardedVideo {
         }
     }
 
-    private static void loadAvailableVideos() {
-        if (VidCoin.getInstance().videoIsAvailableForPlacement(placementCode)){
+    private void loadAvailableVideos() {
+        if (VidCoin.getInstance().videoIsAvailableForPlacement(placementCode, zoneId)) {
+            isLoaded = true;
             MoPubRewardedVideoManager.onRewardedVideoLoadSuccess(VidcoinRewardedVideo.class, VIDCOIN_AD_NETWORK_CONSTANT);
         } else {
             MoPubRewardedVideoManager.onRewardedVideoLoadFailure(VidcoinRewardedVideo.class, VIDCOIN_AD_NETWORK_CONSTANT, MoPubErrorCode.NETWORK_NO_FILL);
@@ -158,10 +208,10 @@ public class VidcoinRewardedVideo extends CustomEventRewardedVideo {
     /**
      * CustomEventRewardedVideoListener implementation
      */
-    private static class VidcoinRewardedVideoListener implements CustomEventRewardedVideoListener, VidCoinCallBack {
+    private class VidcoinRewardedVideoListener implements CustomEventRewardedVideoListener, VidCoinCallBack {
 
         @Override
-        public void vidCoinCampaignsUpdate() {
+        public void vidCoinCampaignsUpdate(String placementCode) {
             loadAvailableVideos();
         }
 
@@ -172,20 +222,27 @@ public class VidcoinRewardedVideo extends CustomEventRewardedVideo {
 
         @Override
         public void vidCoinViewDidDisappearWithViewInformation(HashMap<VidCoinBase.VCData, String> hashMap) {
-            //
+            vidCoinDidValidateView(hashMap, true);
+            MoPubRewardedVideoManager.onRewardedVideoClosed(VidcoinRewardedVideo.class, "vidcoin_id");
         }
 
         @Override
         public void vidCoinDidValidateView(HashMap<VidCoinBase.VCData, String> hashMap) {
+            vidCoinDidValidateView(hashMap, false);
+        }
+
+        private void vidCoinDidValidateView(HashMap<VidCoinBase.VCData, String> hashMap, boolean display) {
+            if (!display) return;
+
             String statusCode = hashMap.get(VidCoin.VCData.VC_DATA_STATUS_CODE);
             if (statusCode.equalsIgnoreCase(VC_STATUS_CODE_SUCCESS.toString())) {
                 int reward = Integer.parseInt(hashMap.get(VidCoin.VCData.VC_DATA_REWARD));
                 MoPubRewardedVideoManager.onRewardedVideoCompleted(VidcoinRewardedVideo.class, VIDCOIN_AD_NETWORK_CONSTANT, MoPubReward.success("", reward));
             } else if (statusCode.equalsIgnoreCase(VC_STATUS_CODE_ERROR.toString())) {
-                MoPubLog.e( "An error occurred during view validation.");
+                MoPubLog.e("An error occurred during view validation.");
                 MoPubRewardedVideoManager.onRewardedVideoCompleted(VidcoinRewardedVideo.class, VIDCOIN_AD_NETWORK_CONSTANT, MoPubReward.failure());
             } else if (statusCode.equalsIgnoreCase(VC_STATUS_CODE_CANCEL.toString())) {
-                MoPubRewardedVideoManager.onRewardedVideoClosed(VidcoinRewardedVideo.class, VIDCOIN_AD_NETWORK_CONSTANT);
+                // onRewardedVideoClosed - must be called everytime
             } else {
                 MoPubLog.e("An unknown occurred during view validation.");
                 MoPubRewardedVideoManager.onRewardedVideoCompleted(VidcoinRewardedVideo.class, VIDCOIN_AD_NETWORK_CONSTANT, MoPubReward.failure());
@@ -193,72 +250,4 @@ public class VidcoinRewardedVideo extends CustomEventRewardedVideo {
         }
     }
 
-    /**
-     * VidcoinLifecycleListener implementation
-     */
-    private static final class VidcoinLifecycleListener extends BaseLifecycleListener {
-        @Override
-        public void onStart(@NonNull Activity activity) {
-            super.onStart(activity);
-            VidCoin.getInstance().onStart();
-        }
-
-        @Override
-        public void onStop(@NonNull Activity activity) {
-            super.onStop(activity);
-            VidCoin.getInstance().onStop();
-        }
-    }
-
-
-    /**
-     * VidcoinMediationSettings implementation
-     */
-    public static final class VidcoinMediationSettings implements MediationSettings {
-        
-        @Nullable
-        private final VidCoinBase.VCUserGender userGender;
-
-        @Nullable
-        private final String userAppId;
-
-        @Nullable
-        private final String userBirthYear;
-
-        public static class Builder {
-            @Nullable
-            private VidCoinBase.VCUserGender userGender;
-
-            @Nullable
-            private String userAppId;
-
-            @Nullable
-            private String userBirthYear;
-
-            public Builder withUserGender(@NonNull VidCoinBase.VCUserGender gender) {
-                this.userGender = gender;
-                return this;
-            }
-
-            public Builder withUserAppId(@NonNull String appId) {
-                this.userAppId = appId;
-                return this;
-            }
-
-            public Builder withUserBirthYear(@NonNull String birthYear) {
-                this.userBirthYear = birthYear;
-                return this;
-            }
-
-            public VidcoinMediationSettings build() {
-                return new VidcoinMediationSettings(this);
-            }
-        }
-
-        private VidcoinMediationSettings(@NonNull Builder builder) {
-            this.userGender = builder.userGender;
-            this.userAppId = builder.userAppId;
-            this.userBirthYear = builder.userBirthYear;
-        }
-    }
 }
