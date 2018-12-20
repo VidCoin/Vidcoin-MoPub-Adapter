@@ -43,20 +43,22 @@ public class VidcoinInterstitialVideo extends CustomEventInterstitial {
         if (!(context instanceof Activity)) {
             MoPubLog.e("loadInterstitial must be called on an Activity context");
             this.customEventInterstitialListener.onInterstitialFailed(MoPubErrorCode.INTERNAL_ERROR);
+            return;
         }
 
         if (!isInitialized) {
-            String appId;
+            String appId = null;
             if (serverExtras.containsKey(APP_ID)) {
                 appId = serverExtras.get(APP_ID);
                 if (TextUtils.isEmpty(appId)) {
                     MoPubLog.e("Vidcoin failed due to empty " + APP_ID);
                     this.customEventInterstitialListener.onInterstitialFailed(MoPubErrorCode.ADAPTER_CONFIGURATION_ERROR);
-                    return;
                 }
             } else {
                 MoPubLog.e("Vidcoin failed due to empty " + APP_ID);
                 this.customEventInterstitialListener.onInterstitialFailed(MoPubErrorCode.ADAPTER_CONFIGURATION_ERROR);
+            }
+            if (appId == null) {
                 return;
             }
 
@@ -67,11 +69,8 @@ public class VidcoinInterstitialVideo extends CustomEventInterstitial {
                 isGDPRApplicable = personalInfoManager.gdprApplies();
             }
 
-            VidCoin.getInstance().init(context, appId, MoPub.canCollectPersonalInformation(),
-                    isGDPRApplicable);
-
+            VidCoin.getInstance().init(context, appId, MoPub.canCollectPersonalInformation(), isGDPRApplicable);
             isInitialized = true;
-
             MoPubLifecycleManager.getInstance((Activity) context).addLifecycleListener(new VidcoinLifecycleListener());
         } else {
             PersonalInfoManager personalInfoManager = MoPub.getPersonalInformationManager();
@@ -106,7 +105,7 @@ public class VidcoinInterstitialVideo extends CustomEventInterstitial {
                     // vidCoinCampaignsUpdate should have been called in the mean time
                     if (!isLoaded) {
                         MoPubLog.d("Vidcoin: Timeout runnable interstitial");
-                        VidcoinInterstitialVideo.this.customEventInterstitialListener.onInterstitialFailed(MoPubErrorCode.NETWORK_NO_FILL);
+                        VidcoinInterstitialVideo.this.customEventInterstitialListener.onInterstitialFailed(MoPubErrorCode.EXPIRED);
                     }
                 }
             }, 5000);
@@ -118,7 +117,7 @@ public class VidcoinInterstitialVideo extends CustomEventInterstitial {
             customEventInterstitialListener.onInterstitialLoaded();
             isLoaded = true;
         } else {
-            customEventInterstitialListener.onInterstitialFailed(MoPubErrorCode.VIDEO_NOT_AVAILABLE);
+            customEventInterstitialListener.onInterstitialFailed(MoPubErrorCode.NETWORK_NO_FILL);
         }
     }
 
@@ -129,7 +128,7 @@ public class VidcoinInterstitialVideo extends CustomEventInterstitial {
             VidCoin.getInstance().playAdForPlacement(vidcoinContext, placementCode, zoneId, -1);
         } else {
             MoPubLog.d("Failed to present Vidcoin ad.");
-            customEventInterstitialListener.onInterstitialFailed(MoPubErrorCode.INTERNAL_ERROR);
+            customEventInterstitialListener.onInterstitialFailed(MoPubErrorCode.VIDEO_PLAYBACK_ERROR);
         }
     }
 
@@ -164,12 +163,12 @@ public class VidcoinInterstitialVideo extends CustomEventInterstitial {
             if (!display) return;
 
             String statusCode = hashMap.get(VidCoin.VCData.VC_DATA_STATUS_CODE);
-            if (statusCode.equalsIgnoreCase(VC_STATUS_CODE_SUCCESS.toString())) {
+            if (VC_STATUS_CODE_SUCCESS.toString().equalsIgnoreCase(statusCode)) {
                 customEventInterstitialListener.onInterstitialDismissed();
-            } else if (statusCode.equalsIgnoreCase(VC_STATUS_CODE_ERROR.toString())) {
+            } else if (VC_STATUS_CODE_ERROR.toString().equalsIgnoreCase(statusCode)) {
                 MoPubLog.e("An error occurred during view validation.");
                 customEventInterstitialListener.onInterstitialFailed(MoPubErrorCode.VIDEO_PLAYBACK_ERROR);
-            } else if (statusCode.equalsIgnoreCase(VC_STATUS_CODE_CANCEL.toString())) {
+            } else if (VC_STATUS_CODE_CANCEL.toString().equalsIgnoreCase(statusCode)) {
                 customEventInterstitialListener.onInterstitialDismissed();
             } else {
                 MoPubLog.e("An unknown occurred during view validation.");

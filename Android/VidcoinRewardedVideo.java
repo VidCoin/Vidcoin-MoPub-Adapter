@@ -18,7 +18,6 @@ import com.vidcoin.sdkandroid.core.interfaces.VidCoinCallBack;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.vidcoin.sdkandroid.core.VidCoinBase.VCStatusCode.VC_STATUS_CODE_CANCEL;
 import static com.vidcoin.sdkandroid.core.VidCoinBase.VCStatusCode.VC_STATUS_CODE_ERROR;
 import static com.vidcoin.sdkandroid.core.VidCoinBase.VCStatusCode.VC_STATUS_CODE_SUCCESS;
 
@@ -29,10 +28,6 @@ public class VidcoinRewardedVideo extends CustomEventRewardedVideo {
     private static final String ZONE_ID = "zoneId";
     private static final String PLACEMENT_CODE = "placementCode";
 
-    private static final String KEY_USER_APP_ID = "VC_USER_APP_ID";
-    private static final String KEY_USER_BIRTH_YEAR = "VC_USER_BIRTH_YEAR";
-    private static final String KEY_USER_GENDER = "VC_USER_GENDER";
-
     private VidcoinRewardedVideoListener vidcoinVideoListener = new VidcoinRewardedVideoListener();
     private VidcoinLifecycleListener vidcoinLifecycleListener = new VidcoinLifecycleListener();
     private String placementCode = null;
@@ -42,6 +37,7 @@ public class VidcoinRewardedVideo extends CustomEventRewardedVideo {
     private Activity vidcoinContext = null;
 
     private boolean isLoaded;
+
 
     @Nullable
     @Override
@@ -71,16 +67,17 @@ public class VidcoinRewardedVideo extends CustomEventRewardedVideo {
             MoPubLog.d("Vidcoin already initialized");
             return false;
         }
-
-        String appId;
+        String appId = null;
         if (serverExtras.containsKey(APP_ID)) {
             appId = serverExtras.get(APP_ID);
             if (TextUtils.isEmpty(appId)) {
                 MoPubLog.e("Vidcoin failed due to empty " + APP_ID);
-                return false;
             }
         } else {
             MoPubLog.e("Vidcoin failed due to empty " + APP_ID);
+        }
+
+        if (appId == null) {
             return false;
         }
 
@@ -115,6 +112,7 @@ public class VidcoinRewardedVideo extends CustomEventRewardedVideo {
             placementCode = serverExtras.get(PLACEMENT_CODE);
             if (TextUtils.isEmpty(placementCode)) placementCode = "";
         }
+
         // pass the zoneId from moPub to vidCoin sdk
         fetchZoneIdFromExtra(serverExtras);
 
@@ -134,7 +132,8 @@ public class VidcoinRewardedVideo extends CustomEventRewardedVideo {
                 public void run() {
                     if (!isLoaded) {
                         MoPubLog.d("Vidcoin: Timeout runnable rewarded");
-                        MoPubRewardedVideoManager.onRewardedVideoLoadFailure(VidcoinRewardedVideo.class, "vidcoin_id", MoPubErrorCode.NETWORK_NO_FILL);
+                        MoPubRewardedVideoManager.onRewardedVideoLoadFailure(VidcoinRewardedVideo.class, "vidcoin_id", MoPubErrorCode.EXPIRED);
+                        onInvalidate();
                     }
                 }
             }, 5000);
@@ -156,12 +155,14 @@ public class VidcoinRewardedVideo extends CustomEventRewardedVideo {
             VidCoin.getInstance().playAdForPlacement(vidcoinContext, placementCode, zoneId, -1);
         } else {
             MoPubLog.d("Failed to present Vidcoin ad.");
+            MoPubRewardedVideoManager.onRewardedVideoLoadFailure(VidcoinRewardedVideo.class, "vidcoin_id", MoPubErrorCode.VIDEO_PLAYBACK_ERROR);
         }
     }
 
     private void fetchZoneIdFromExtra(@NonNull Map<String, String> serverExtras) {
         if (serverExtras.containsKey(ZONE_ID)) {
             zoneId = serverExtras.get(ZONE_ID);
+            MoPubLog.d("Fetch zone id " + zoneId);
         }
     }
 
@@ -235,14 +236,18 @@ public class VidcoinRewardedVideo extends CustomEventRewardedVideo {
             if (!display) return;
 
             String statusCode = hashMap.get(VidCoin.VCData.VC_DATA_STATUS_CODE);
-            if (statusCode.equalsIgnoreCase(VC_STATUS_CODE_SUCCESS.toString())) {
-                int reward = Integer.parseInt(hashMap.get(VidCoin.VCData.VC_DATA_REWARD));
+            if (VC_STATUS_CODE_SUCCESS.toString().equalsIgnoreCase(statusCode)) {
+                int reward;
+                try {
+                    String value = hashMap.get(VidCoin.VCData.VC_DATA_REWARD);
+                    reward = value != null ? Integer.parseInt(value) : 0;
+                } catch (Exception e) {
+                    reward = 0;
+                }
                 MoPubRewardedVideoManager.onRewardedVideoCompleted(VidcoinRewardedVideo.class, VIDCOIN_AD_NETWORK_CONSTANT, MoPubReward.success("", reward));
-            } else if (statusCode.equalsIgnoreCase(VC_STATUS_CODE_ERROR.toString())) {
+            } else if (VC_STATUS_CODE_ERROR.toString().equalsIgnoreCase(statusCode)) {
                 MoPubLog.e("An error occurred during view validation.");
                 MoPubRewardedVideoManager.onRewardedVideoCompleted(VidcoinRewardedVideo.class, VIDCOIN_AD_NETWORK_CONSTANT, MoPubReward.failure());
-            } else if (statusCode.equalsIgnoreCase(VC_STATUS_CODE_CANCEL.toString())) {
-                // onRewardedVideoClosed - must be called everytime
             } else {
                 MoPubLog.e("An unknown occurred during view validation.");
                 MoPubRewardedVideoManager.onRewardedVideoCompleted(VidcoinRewardedVideo.class, VIDCOIN_AD_NETWORK_CONSTANT, MoPubReward.failure());
