@@ -34,7 +34,8 @@ public class VidcoinInterstitialVideo extends CustomEventInterstitial {
     private CustomEventInterstitialListener customEventInterstitialListener;
 
     private Context vidcoinContext = null;
-    private boolean isLoaded;
+    private boolean isCampaignLoadEnd = false;
+
 
     @Override
     protected void loadInterstitial(Context context, CustomEventInterstitialListener customEventInterstitialListener, Map<String, Object> localExtras, Map<String, String> serverExtras) {
@@ -93,33 +94,20 @@ public class VidcoinInterstitialVideo extends CustomEventInterstitial {
         }
 
         VidCoin.getInstance().requestAdForPlacement(placementCode, zoneId, vidcoinVideoListener);
-
         vidcoinContext = context;
-
-        if (isLoaded) {
-            loadAvailableVideos();
-        } else {
-            new Handler().postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    // vidCoinCampaignsUpdate should have been called in the mean time
-                    if (!isLoaded) {
-                        MoPubLog.d("Vidcoin: Timeout runnable interstitial");
-                        VidcoinInterstitialVideo.this.customEventInterstitialListener.onInterstitialFailed(MoPubErrorCode.EXPIRED);
-                    }
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                // vidCoinCampaignsUpdate should have been called in the mean time
+                if (!isCampaignLoadEnd) {
+                    MoPubLog.d("Vidcoin: Timeout runnable interstitial");
+                    VidcoinInterstitialVideo.this.customEventInterstitialListener.onInterstitialFailed(MoPubErrorCode.EXPIRED);
                 }
-            }, 5000);
-        }
+            }
+        }, 5000);
+
     }
 
-    private void loadAvailableVideos() {
-        if (VidCoin.getInstance().videoIsAvailableForPlacement(placementCode, zoneId)) {
-            customEventInterstitialListener.onInterstitialLoaded();
-            isLoaded = true;
-        } else {
-            customEventInterstitialListener.onInterstitialFailed(MoPubErrorCode.NETWORK_NO_FILL);
-        }
-    }
 
     @Override
     protected void showInterstitial() {
@@ -139,9 +127,15 @@ public class VidcoinInterstitialVideo extends CustomEventInterstitial {
 
     public class VidcoinInterstitialVideoListener implements VidCoinCallBack {
 
+
         @Override
-        public void vidCoinCampaignsUpdate(String placementCode) {
-            loadAvailableVideos();
+        public void vidCoinCampaignLoadEnd(String placementCode, boolean campaignAvailable) {
+            isCampaignLoadEnd = true;
+            if (campaignAvailable) {
+                customEventInterstitialListener.onInterstitialLoaded();
+            } else {
+                customEventInterstitialListener.onInterstitialFailed(MoPubErrorCode.NETWORK_NO_FILL);
+            }
         }
 
         @Override

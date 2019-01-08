@@ -36,7 +36,8 @@ public class VidcoinRewardedVideo extends CustomEventRewardedVideo {
 
     private Activity vidcoinContext = null;
 
-    private boolean isLoaded;
+    private boolean isCampaignLoadEnd = false;
+    private boolean isCampaignAvailable= false;
 
 
     @Nullable
@@ -107,6 +108,10 @@ public class VidcoinRewardedVideo extends CustomEventRewardedVideo {
         if (personalInfoManager != null && personalInfoManager.gdprApplies()) {
             boolean canCollectPersonalInfo = personalInfoManager.canCollectPersonalInformation();
             VidCoin.getInstance().setUserConsent(canCollectPersonalInfo);
+            if (!canCollectPersonalInfo) {
+                MoPubRewardedVideoManager.onRewardedVideoLoadFailure(VidcoinRewardedVideo.class, "vidcoin_id", MoPubErrorCode.NETWORK_NO_FILL);
+            }
+
         }
         if (serverExtras.containsKey(PLACEMENT_CODE)) {
             placementCode = serverExtras.get(PLACEMENT_CODE);
@@ -124,33 +129,27 @@ public class VidcoinRewardedVideo extends CustomEventRewardedVideo {
 
         VidCoin.getInstance().requestAdForPlacement(placementCode, zoneId, vidcoinVideoListener);
 
-        if (isLoaded) {
-            loadAvailableVideos();
-        } else {
-            new Handler().postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    if (!isLoaded) {
-                        MoPubLog.d("Vidcoin: Timeout runnable rewarded");
-                        MoPubRewardedVideoManager.onRewardedVideoLoadFailure(VidcoinRewardedVideo.class, "vidcoin_id", MoPubErrorCode.EXPIRED);
-                        onInvalidate();
-                    }
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (!isCampaignLoadEnd) {
+                    MoPubLog.d("Vidcoin: Timeout runnable rewarded");
+                    MoPubRewardedVideoManager.onRewardedVideoLoadFailure(VidcoinRewardedVideo.class, "vidcoin_id", MoPubErrorCode.EXPIRED);
+                    onInvalidate();
                 }
-            }, 5000);
-        }
+            }
+        }, 5000);
+
     }
 
     @Override
     protected boolean hasVideoAvailable() {
-        boolean isVideoAvailable = VidCoin.getInstance().videoIsAvailableForPlacement(placementCode, zoneId);
-        if (isVideoAvailable)
-            isLoaded = true;
-        return isVideoAvailable;
+        return isCampaignAvailable;
     }
 
     @Override
     protected void showVideo() {
-        if (hasVideoAvailable() && vidcoinContext != null) {
+        if (VidCoin.getInstance().videoIsAvailableForPlacement(placementCode, zoneId) && vidcoinContext != null) {
             MoPubLog.d("Presenting Vidcoin ad.");
             VidCoin.getInstance().playAdForPlacement(vidcoinContext, placementCode, zoneId, -1);
         } else {
@@ -197,23 +196,20 @@ public class VidcoinRewardedVideo extends CustomEventRewardedVideo {
         }
     }
 
-    private void loadAvailableVideos() {
-        if (VidCoin.getInstance().videoIsAvailableForPlacement(placementCode, zoneId)) {
-            isLoaded = true;
-            MoPubRewardedVideoManager.onRewardedVideoLoadSuccess(VidcoinRewardedVideo.class, VIDCOIN_AD_NETWORK_CONSTANT);
-        } else {
-            MoPubRewardedVideoManager.onRewardedVideoLoadFailure(VidcoinRewardedVideo.class, VIDCOIN_AD_NETWORK_CONSTANT, MoPubErrorCode.NETWORK_NO_FILL);
-        }
-    }
-
     /**
      * CustomEventRewardedVideoListener implementation
      */
     private class VidcoinRewardedVideoListener implements CustomEventRewardedVideoListener, VidCoinCallBack {
 
         @Override
-        public void vidCoinCampaignsUpdate(String placementCode) {
-            loadAvailableVideos();
+        public void vidCoinCampaignLoadEnd(String placementCode, boolean campaignAvailable) {
+            isCampaignLoadEnd = true;
+            isCampaignAvailable = campaignAvailable;
+            if (campaignAvailable) {
+                MoPubRewardedVideoManager.onRewardedVideoLoadSuccess(VidcoinRewardedVideo.class, VIDCOIN_AD_NETWORK_CONSTANT);
+            } else {
+                MoPubRewardedVideoManager.onRewardedVideoLoadFailure(VidcoinRewardedVideo.class, VIDCOIN_AD_NETWORK_CONSTANT, MoPubErrorCode.NETWORK_NO_FILL);
+            }
         }
 
         @Override
