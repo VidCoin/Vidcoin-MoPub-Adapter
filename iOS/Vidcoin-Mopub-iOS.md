@@ -1,4 +1,3 @@
-# Vidcoin Mediation Adapter for MoPub SDK for iOS
-![Vidcoin](https://d3rud9259azp35.cloudfront.net/documentation/Vidcoin-Logo.png)
+# VoodooAds Mediation Adapter for MoPub SDK for iOS
 
-Please refer to [MoPub Adapter for iOS](https://documentation.vidcoin.com/Vidcoin-Mopub-iOS.html)
+Please refer to [MoPub Adapter for iOS](https://github.com/VidCoin/VidCoin-iOS-SDK/releases/tag/v3.0.0)
